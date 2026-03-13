@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Forecast ☔️</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>🌤️ Weather Forecast</h1>
+
+        <% if (locals.error) { %>
+            <div class="error"><%= error %></div>
+        <% } %>
+
+        <% if (!locals.forecast) { %>
+            <form action="/get-weather" method="POST" autocomplete="off">
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        id="cityInput" 
+                        name="city" 
+                        placeholder="Search for a city..." 
+                        required
+                    >
+                    <ul id="suggestions" class="dropdown"></ul>
+                </div>
+                <div style="text-align: center;">
+                    <button type="submit">Get Forecast</button>
+                </div>
+            </form>
+        <% } %>
+
+        <% if (locals.forecast) { %>
+            <div class="forecast-container">
+                <h2>📍 <%= city %></h2>
+                
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <a href="/" class="btn">🔍 Search Another City</a>
+                </div>
+
+                <% if (locals.aiSuggestions) { %>
+                <div class="ai-suggestions">
+                    <h3>🤖 AI Weather Advisor</h3>
+                    <div class="suggestions-content">
+                        <%= aiSuggestions %>
+                    </div>
+                </div>
+                <% } %>
+        
+                <div class="day-navigation">
+                    <% forecast.forEach((day, index) => { %>
+                        <button 
+                            class="tab-btn <%= index === 0 ? 'active' : '' %>" 
+                            onclick="showDay('<%= index %>')"
+                            id="btn-<%= index %>"
+                        >
+                            <%= day.date.split(',')[0] %>
+                        </button>
+                    <% }) %>
+                </div>
+        
+                <div class="days-content">
+                    <% forecast.forEach((day, index) => { %>
+                        <div class="day-row" id="day-<%= index %>" style="display: '<%= index === 0 ? 'block' : 'none' %>;'">
+                            <div class="day-label">
+                                <strong><%= day.date %></strong>
+                            </div>
+                            
+                            <div class="hourly-grid">
+                                <% day.hours.forEach(hour => { %>
+                                    <div class="hour-card">
+                                        <span class="time"><%= new Date(hour.dt * 1000).getHours() %>:00</span>
+                                        <img 
+                                            src="https://openweathermap.org/img/wn/<%= hour.weather[0].icon %>@2x.png" 
+                                            alt="<%= hour.weather[0].description %>"
+                                        >
+                                        <span class="temp"><%= Math.round(hour.main.temp) %>°C</span>
+                                        <span class="condition"><%= hour.weather[0].main %></span>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+        <% } %>
+    </div>
+
+    <script>
+        // --- AUTOCOMPLETE LOGIC ---
+        const input = document.getElementById('cityInput');
+        const suggestions = document.getElementById('suggestions');
+
+        if (input) {
+            input.addEventListener('input', async () => {
+                const value = input.value.trim();
+                if (value.length < 3) {
+                    suggestions.innerHTML = '';
+                    suggestions.style.display = 'none';
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/search-cities?q=${encodeURIComponent(value)}`);
+                    const cities = await response.json();
+
+                    suggestions.innerHTML = '';
+                    if (cities.length > 0) {
+                        suggestions.style.display = 'block';
+                        cities.forEach(city => {
+                            const li = document.createElement('li');
+                            const locationStr = `${city.name}, ${city.state ? city.state + ', ' : ''}${city.country}`;
+                            li.innerHTML = `
+                                <span class="city-name">${city.name}</span>
+                                <span class="location-sub">${city.state ? city.state + ', ' : ''}${city.country}</span>
+                            `;
+                            li.onclick = () => {
+                                input.value = locationStr;
+                                suggestions.innerHTML = '';
+                                suggestions.style.display = 'none';
+                            };
+                            suggestions.appendChild(li);
+                        });
+                    } else {
+                        suggestions.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error("Error fetching cities:", error);
+                    suggestions.style.display = 'none';
+                }
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (input && !input.contains(e.target) && suggestions && !suggestions.contains(e.target)) {
+                    suggestions.style.display = 'none';
+                }
+            });
+        }
+
+        // --- TAB SWITCHING LOGIC ---
+        function showDay(index) {
+            const idx = parseInt(index);
+            
+            // Hide all day content rows
+            const rows = document.querySelectorAll('.day-row');
+            rows.forEach(row => row.style.display = 'none');
+
+            // Deactivate all buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Show selected content and activate button
+            const targetRow = document.getElementById('day-' + idx);
+            const targetBtn = document.getElementById('btn-' + idx);
+            
+            if (targetRow) targetRow.style.display = 'block';
+            if (targetBtn) targetBtn.classList.add('active');
+        }
+    </script>
+</body>
+</html>
